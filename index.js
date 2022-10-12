@@ -1,6 +1,5 @@
 import TelegramApi from "node-telegram-bot-api";
 import mysql from "mysql2/promise";
-import axios from "axios";
 import fs from "fs";
 import { getOrders, sendCode } from "./API/OrderService.js";
 import {
