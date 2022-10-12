@@ -86,7 +86,7 @@ try {
           const [use, storeId, api_token] = data.split(" ");
           const orders = await getOrders(api_token);
           const text = orders.map((order, index) => {
-            return `[${index}] 🔶 ${order.attributes.deliveryAddress.formattedAddress} 🔶 ${order.attributes.customer.cellPhone}`;
+            return `[${index}] 🔶 ${order.attributes.deliveryAddress.formattedAddress} 🔶 <a href="tel:>${order.attributes.customer.cellPhone}">${order.attributes.customer.cellPhone}</a>`;
           });
           const answer = text.join("\n\n");
           if (orders.length === 0) {
@@ -104,7 +104,7 @@ try {
               chatId,
               "Выбери заказ: Напиши номер заказа или номер заказа вместе с кодом через пробел.\n\n" +
                 answer,
-              forceReply
+              { ...forceReply, parse_mode: "HTML" }
             )
             .then(async (msg2) => {
               await bot.answerCallbackQuery(queryId, {
