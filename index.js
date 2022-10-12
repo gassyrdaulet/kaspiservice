@@ -89,6 +89,13 @@ try {
             return `[${index}] 🔶 ${order.attributes.deliveryAddress.formattedAddress} 🔶 ${order.attributes.customer.cellPhone}`;
           });
           const answer = text.join("\n\n");
+          if (orders.length === 0) {
+            await bot.answerCallbackQuery(queryId, {
+              text: "Нет заказов.",
+            });
+            await bot.sendMessage(chatId, "Заказов нет. ID: " + storeId);
+            return;
+          }
           await bot
             .sendMessage(
               chatId,
