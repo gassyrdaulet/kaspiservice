@@ -142,7 +142,6 @@ try {
                         return;
                       }
                     }
-                    console.log(code);
                     await sendCode(api_token, orders[key].id);
                     await bot
                       .sendMessage(
