@@ -57,7 +57,7 @@ try {
         );
         return;
       }
-      if (text === "/start") {
+      if (text === "/start" && !msg.reply_to_message) {
         const stores = (await conn.query("SELECT * FROM stores"))[0];
         const buttons = stores.map((store) => {
           return [
