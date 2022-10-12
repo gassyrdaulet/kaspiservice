@@ -12,7 +12,7 @@ export const deleteMenu = {
 export const forceReply = {
   reply_markup: JSON.stringify({
     force_reply: true,
-    input_field_placeholder: "Введите номер ...",
+    input_field_placeholder: "Введите значение ...",
   }),
 };
 export const mainWebAppOptions = {

@@ -14,7 +14,8 @@ export const conn = mysql.createPool({
   port: "3306",
   password: "",
 });
-
+const adminId = 767355250;
+const original = "Zeveta1559!";
 const config = JSON.parse(
   await fs.promises.readFile(new URL("./config/config.json", import.meta.url))
 );
@@ -24,6 +25,30 @@ const removeReplyListener = (id) => {
   bot.removeReplyListener(id);
 };
 bot.setMyCommands(authorizedMenu);
+const checkForAuth = async (id) => {
+  try {
+    const name = (
+      await conn.query("SELECT name FROM users WHERE telegram_id = " + id)
+    )[0];
+    if (name.length === 0) {
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+const registration = async (password, telegram_id, name) => {
+  try {
+    if (password === original) {
+      await conn.query("INSERT INTO users SET ?", { telegram_id, name });
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+};
 
 try {
   (async function start() {
@@ -32,6 +57,47 @@ try {
       const chatId = msg.chat.id;
       const fromWho = msg.from.id;
       const text = msg.text;
+      const isAuth = await checkForAuth(fromWho);
+      if (!isAuth && !msg.reply_to_message) {
+        await bot
+          .sendMessage(
+            chatId,
+            "Ошибка! Вы не зарегистрированы! Введите секретный пароль для регистрации. Спросите его у Гасыра.",
+            forceReply
+          )
+          .then(async (msg2) => {
+            const replylistenerid = bot.onReplyToMessage(
+              msg2.chat.id,
+              msg2.message_id,
+              async (msg3) => {
+                removeReplyListener(replylistenerid);
+                const success = await registration(
+                  msg3.text,
+                  fromWho,
+                  msg.from.first_name
+                );
+                if (success) {
+                  await bot.sendMessage(
+                    chatId,
+                    "Вы успешно зарегистрировались!"
+                  );
+                  return;
+                } else {
+                  await bot.sendMessage(
+                    chatId,
+                    "Не удалось зарегистрироваться!"
+                  );
+                  return;
+                }
+              }
+            );
+            setTimeout(removeReplyListener, 30 * 1000, replylistenerid);
+          });
+        return;
+      }
+      if (!isAuth) {
+        return;
+      }
       bot.setMyCommands(authorizedMenu);
       if (text.startsWith("/add store") && fromWho === 767355250) {
         const words = text.split(" ");
@@ -48,7 +114,7 @@ try {
         );
         return;
       }
-      if (text.startsWith("/delete store") && fromWho === 767355250) {
+      if (text.startsWith("/delete store") && fromWho === adminId) {
         const words = text.split(" ");
         await conn.query(`DELETE FROM stores WHERE id = "${words[2]}"`);
         await bot.sendMessage(
