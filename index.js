@@ -86,7 +86,7 @@ try {
           const [use, storeId, api_token] = data.split(" ");
           const orders = await getOrders(api_token);
           const text = orders.map((order, index) => {
-            return `[${index}] 🔶 ${order.attributes.deliveryAddress.formattedAddress} 🔶 <a href="tel:>${order.attributes.customer.cellPhone}">${order.attributes.customer.cellPhone}</a>`;
+            return `[${index}] 🔶 ${order.attributes.deliveryAddress.formattedAddress} 🔶 <a href="tel:${order.attributes.customer.cellPhone}">${order.attributes.customer.cellPhone}</a>`;
           });
           const answer = text.join("\n\n");
           if (orders.length === 0) {
