@@ -86,7 +86,7 @@ try {
           const [use, storeId, api_token] = data.split(" ");
           const orders = await getOrders(api_token);
           const text = orders.map((order, index) => {
-            return `[${index}] 🔶 ${order.attributes.deliveryAddress.formattedAddress} 🔶 <a href="https:://kaspi.kz">${order.attributes.customer.cellPhone}</a>`;
+            return `[${index}] 🔶 ${order.attributes.deliveryAddress.formattedAddress} 🔶 <a href="tel:+7768290879">${order.attributes.customer.cellPhone}</a>`;
           });
           const answer = text.join("\n\n");
           if (orders.length === 0) {
@@ -135,8 +135,8 @@ try {
                         await bot.sendMessage(
                           chatId,
                           "Ошибка! Кажется код не верен...\n" +
-                            (e.response.data?.errors
-                              ? e.response.data.errors[0].title
+                            (e.response?.data?.errors
+                              ? e.response?.data.errors[0].title
                               : e.message)
                         );
                         return;
@@ -171,8 +171,8 @@ try {
                               await bot.sendMessage(
                                 msg4.chat.id,
                                 "Ошибка! Кажется код не верен...\n" +
-                                  (e.response.data?.errors
-                                    ? e.response.data.errors[0].title
+                                  (e.response?.data?.errors
+                                    ? e.response?.data.errors[0].title
                                     : e.message)
                               );
                             }
@@ -188,7 +188,7 @@ try {
                     await bot.sendMessage(
                       msg2.chat.id,
                       "Ошибка! Неправильный номер заказа или возможно вы уже недавно отправляли код. Попробуйте еще раз немного позднее.\n" +
-                        (e.response.data?.errors
+                        (e.response?.data?.errors
                           ? e.response.data.errors[0].title
                           : e.message)
                     );
