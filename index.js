@@ -93,7 +93,10 @@ try {
             await bot.answerCallbackQuery(queryId, {
               text: "Нет заказов.",
             });
-            await bot.sendMessage(chatId, "Заказов нет. ID: " + storeId);
+            await bot.sendMessage(
+              chatId,
+              "На данный момент у этого магазина пока нет никаких заказов."
+            );
             return;
           }
           await bot
