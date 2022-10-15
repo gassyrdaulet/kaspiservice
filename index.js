@@ -169,7 +169,7 @@ try {
             .sendMessage(
               chatId,
               "Выбери заказ: Напиши номер заказа или номер заказа вместе с кодом через пробел. Сообщение принимает ответ в течение " +
-                (replyTimeout / 60000) * +" минут.\n\n" +
+                (parseInt(replyTimeout) / 60000) * +" минут.\n\n" +
                 answer,
               { ...forceReply, parse_mode: "HTML" }
             )
@@ -197,7 +197,7 @@ try {
                         await bot.sendMessage(
                           chatId,
                           "Ошибка! Кажется код не верен...\n" +
-                            (e.response?.data?.errors
+                            (e.response?.data?.errorbs
                               ? e.response?.data.errors[0].title
                               : e.message)
                         );
@@ -209,7 +209,8 @@ try {
                       .sendMessage(
                         msg2.chat.id,
                         "Код успешно отправлен и в скором времени дойдет до покупателя. Чтобы подтвердить код, просто ответьте на это сообщение. В течение " +
-                          (replyTimeout / 60000) * +" минут!",
+                          parseInt(replyTimeout) / 60000 +
+                          " минут!",
                         forceReply
                       )
                       .then((msg3) => {
@@ -242,7 +243,7 @@ try {
                         );
                         setTimeout(
                           removeReplyListener,
-                          replyTimeout,
+                          parseInt(replyTimeout),
                           replylistenerid
                         );
                       });
@@ -257,7 +258,11 @@ try {
                   }
                 }
               );
-              setTimeout(removeReplyListener, replyTimeout, replylistenerid);
+              setTimeout(
+                removeReplyListener,
+                parseInt(replyTimeout),
+                replylistenerid
+              );
             });
         } catch (e) {
           await bot.answerCallbackQuery(queryId, {
