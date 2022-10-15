@@ -168,7 +168,8 @@ try {
           await bot
             .sendMessage(
               chatId,
-              "Выбери заказ: Напиши номер заказа или номер заказа вместе с кодом через пробел.\n\n" +
+              "Выбери заказ: Напиши номер заказа или номер заказа вместе с кодом через пробел. Сообщение принимает ответ в течение " +
+                (replyTimeout / 60000) * +" минут.\n\n" +
                 answer,
               { ...forceReply, parse_mode: "HTML" }
             )
@@ -186,12 +187,7 @@ try {
                     const code = msg.text.split(" ")[1];
                     if (code) {
                       try {
-                        await sendCode(
-                          api_token,
-                          orders[key].id,
-                          true,
-                          parseInt(code)
-                        );
+                        await sendCode(api_token, orders[key].id, true, code);
                         await bot.sendMessage(
                           chatId,
                           "Код абсолютно верен! Заказ успешно выдан."
@@ -212,7 +208,8 @@ try {
                     await bot
                       .sendMessage(
                         msg2.chat.id,
-                        "Код успешно отправлен и в скором времени дойдет до покупателя. Чтобы подтвердить код, просто ответьте на это сообщение.",
+                        "Код успешно отправлен и в скором времени дойдет до покупателя. Чтобы подтвердить код, просто ответьте на это сообщение. В течение " +
+                          (replyTimeout / 60000) * +" минут!",
                         forceReply
                       )
                       .then((msg3) => {
@@ -226,7 +223,7 @@ try {
                                 api_token,
                                 orders[key].id,
                                 true,
-                                parseInt(msg4.text)
+                                msg4.text
                               );
                               await bot.sendMessage(
                                 msg4.chat.id,
