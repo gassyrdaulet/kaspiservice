@@ -52,7 +52,7 @@ const registration = async (password, telegram_id, name) => {
 
 try {
   (async function start() {
-    console.log("Bot started.");
+    console.log("\x1b[32m%s\x1b[0m",`KaspiService Бот запущен... ${(new Date()).toLocaleString()}`);
     bot.on("message", async (msg) => {
       const chatId = msg.chat.id;
       const fromWho = msg.from.id;
@@ -188,6 +188,7 @@ try {
                     if (code) {
                       try {
                         await sendCode(api_token, orders[key].id, true, code);
+			console.log(`${orders[key].attributes.deliveryAddress.formattedAddress} Заказ успешно выдан. ${(new Date()).toLocaleString()}`)
                         await bot.sendMessage(
                           chatId,
                           "Код абсолютно верен! Заказ успешно выдан."
@@ -226,6 +227,7 @@ try {
                                 true,
                                 msg4.text
                               );
+			      console.log(`${orders[key].attributes.deliveryAddress.formattedAddress} Заказ успешно выдан. ${(new Date()).toLocaleString()}`)
                               await bot.sendMessage(
                                 msg4.chat.id,
                                 "Код абсолютно верен! Заказ успешно выдан."
@@ -265,6 +267,7 @@ try {
               );
             });
         } catch (e) {
+          console.log(e);
           await bot.answerCallbackQuery(queryId, {
             text: "Возникла ошибка!\n" + e,
           });
@@ -273,6 +276,7 @@ try {
     });
   })();
 } catch (e) {
-  console.log("Bot crashed");
+  console.log("\x1b[31m%s\x1b[0m",`Бот поломался... ${(new Date()).toLocaleString()}`);
+  console.log("Перезапускаем бота...");
   start();
 }
