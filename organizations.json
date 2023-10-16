@@ -1,0 +1,24 @@
+[
+  {
+    "id": "1",
+    "password": "aset123",
+    "name": "Adal",
+    "stores": [
+      {
+        "id": "1",
+        "name": "Adal",
+        "api_token": "D/YTWovFSRZtNle9wklZYwgpKDXQ26zfBuuTLUOF2XQ="
+      },
+      {
+        "id": "2",
+        "name": "HokoMarket",
+        "api_token": "YDsovhArRp+s/V2uXklmCJE6P7vF7qnLZ9Zl3orXXNQ="
+      },
+      {
+        "id": "3",
+        "name": "ИП Баймолла",
+        "api_token": "mOj8dc8V5w9E4ylHaLCk2SbOmJCMEnERTZvnK/0A1kc="
+      }
+    ]
+  }
+]

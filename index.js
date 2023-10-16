@@ -1,48 +1,61 @@
 import TelegramApi from "node-telegram-bot-api";
-import mysql from "mysql2/promise";
-import fs from "fs";
+import fs from "fs/promises";
+import config from "config";
 import { getOrders, sendCode } from "./API/OrderService.js";
-import {
-  authorizedMenu,
-  forceReply,
-} from "./MenuAndOptions/KeyboardOptions.js";
-import { start } from "repl";
-export const conn = mysql.createPool({
-  host: "127.0.0.1",
-  user: "root",
-  database: "kaspiservice",
-  port: "3306",
-  password: "",
-});
-const adminId = 767355250;
-const original = "Zeveta1559!";
-const config = JSON.parse(
-  await fs.promises.readFile(new URL("./config/config.json", import.meta.url))
-);
-const { token, replyTimeout } = config;
+import moment from "moment";
+
+const { token } = config.get("config");
+const menu = [{ command: "/start", description: "Запустить бота" }];
+
+let dontBother = [];
 export const bot = new TelegramApi(token, { polling: true });
-const removeReplyListener = (id) => {
-  bot.removeReplyListener(id);
-};
-bot.setMyCommands(authorizedMenu);
-const checkForAuth = async (id) => {
+bot.setMyCommands(menu);
+
+setInterval(() => {
+  dontBother = [];
+  console.log("Очищение", dontBother, moment().format("DD.MM HH:mm:ss"));
+}, 900000);
+
+const removeFromDontBother = (telegram_id) => {
   try {
-    const name = (
-      await conn.query("SELECT name FROM users WHERE telegram_id = " + id)
-    )[0];
-    if (name.length === 0) {
-      return false;
-    }
+    dontBother = dontBother.filter((id) => id !== telegram_id);
+    console.log(dontBother);
     return true;
-  } catch (e) {
-    return false;
+  } catch {
+    return true;
   }
 };
-const registration = async (password, telegram_id, name) => {
+
+const addToNotBother = (telegram_id) => {
   try {
-    if (password === original) {
-      await conn.query("INSERT INTO users SET ?", { telegram_id, name });
-      return true;
+    dontBother.push(telegram_id);
+    console.log(dontBother);
+    return true;
+  } catch {
+    return true;
+  }
+};
+
+const checkForBother = (telegram_id) => {
+  try {
+    for (let id of dontBother) {
+      if (telegram_id === id) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return true;
+  }
+};
+
+const checkForAuth = async (telegram_id) => {
+  try {
+    const users = await JSON.parse(await fs.readFile("./users.json"));
+    for (let user of users) {
+      if (user.telegram_id === telegram_id) {
+        return true;
+      }
     }
     return false;
   } catch (e) {
@@ -50,111 +63,229 @@ const registration = async (password, telegram_id, name) => {
   }
 };
 
+const registration = async (telegram_id, name, password) => {
+  try {
+    const organizations = await JSON.parse(
+      await fs.readFile("./organizations.json")
+    );
+    console.log(telegram_id, name, password);
+    const users = await JSON.parse(await fs.readFile("./users.json"));
+    for (let organization of organizations) {
+      if (organization.password === password) {
+        const filteredUsers = users.filter(
+          (user) => user.telegram_id !== telegram_id
+        );
+        filteredUsers.push({
+          telegram_id,
+          name,
+          organization: organization.id,
+        });
+        await fs.writeFile("./users.json", JSON.stringify(filteredUsers));
+        return true;
+      }
+    }
+    return false;
+  } catch (e) {
+    console.log(e);
+    return false;
+  }
+};
+
+const quitTheStore = async (telegram_id) => {
+  try {
+    const users = await JSON.parse(await fs.readFile("./users.json"));
+    const filteredUsers = users.filter(
+      (user) => user.telegram_id !== telegram_id
+    );
+
+    await fs.writeFile("./users.json", JSON.stringify(filteredUsers));
+    return true;
+  } catch (e) {
+    console.log(e);
+    return false;
+  }
+};
+
+const getApiToken = async (telegram_id, storeId) => {
+  try {
+    const organizations = await JSON.parse(
+      await fs.readFile("./organizations.json")
+    );
+    const users = await JSON.parse(await fs.readFile("./users.json"));
+    for (let user of users) {
+      if (user.telegram_id === telegram_id) {
+        for (let organization of organizations) {
+          if (organization.id === user.organization) {
+            for (let store of organization.stores) {
+              if (store.id === storeId) {
+                return store.api_token;
+              }
+            }
+            return "";
+          }
+          return "";
+        }
+        return "";
+      }
+    }
+    return "";
+  } catch (e) {
+    console.log(e);
+    return "";
+  }
+};
+
+const getStores = async (telegram_id) => {
+  try {
+    const organizations = await JSON.parse(
+      await fs.readFile("./organizations.json")
+    );
+    const users = await JSON.parse(await fs.readFile("./users.json"));
+    for (let user of users) {
+      if (user.telegram_id === telegram_id) {
+        for (let organization of organizations) {
+          if (organization.id === user.organization) {
+            return organization.stores;
+          }
+          return false;
+        }
+        return false;
+      }
+    }
+    return false;
+  } catch (e) {
+    console.log(e);
+    return false;
+  }
+};
+
 try {
   (async function start() {
-    console.log("\x1b[32m%s\x1b[0m",`KaspiService Бот запущен... ${(new Date()).toLocaleString()}`);
+    console.log(
+      "\x1b[32m%s\x1b[0m",
+      `\nKaspiService Бот запущен... ${moment().format("DD.MM HH:mm")}`
+    );
     bot.on("message", async (msg) => {
       const chatId = msg.chat.id;
-      const fromWho = msg.from.id;
-      const text = msg.text;
-      const isAuth = await checkForAuth(fromWho);
-      if (!isAuth && !msg.reply_to_message) {
-        await bot
-          .sendMessage(
+      try {
+        const fromWho = msg.from.id;
+        const text = msg.text;
+        const isAuth = await checkForAuth(fromWho);
+        const bother = checkForBother(fromWho);
+        if (!isAuth && !msg.reply_to_message && bother) {
+          await bot.sendMessage(
             chatId,
-            "Ошибка! Вы не зарегистрированы! Введите секретный пароль для регистрации. Спросите его у Гасыра.",
-            forceReply
-          )
-          .then(async (msg2) => {
-            const replylistenerid = bot.onReplyToMessage(
-              msg2.chat.id,
-              msg2.message_id,
-              async (msg3) => {
-                removeReplyListener(replylistenerid);
-                const success = await registration(
-                  msg3.text,
-                  fromWho,
-                  msg.from.first_name
-                );
-                if (success) {
-                  await bot.sendMessage(
-                    chatId,
-                    "Вы успешно зарегистрировались!"
-                  );
-                  return;
-                } else {
-                  await bot.sendMessage(
-                    chatId,
-                    "Не удалось зарегистрироваться!"
-                  );
-                  return;
-                }
-              }
+            "Ошибка! Вы не зарегистрированы! Введите секретный код для регистрации. Спросите его у Владельца магазина."
+          );
+          addToNotBother(fromWho);
+          bot.once("message", async (msg) => {
+            const success = await registration(
+              fromWho,
+              msg.from.first_name,
+              msg.text
             );
-            setTimeout(removeReplyListener, 30 * 1000, replylistenerid);
+            removeFromDontBother(fromWho);
+            if (success) {
+              await bot.sendMessage(chatId, "Вы успешно зарегистрировались!");
+              return;
+            } else {
+              await bot.sendMessage(chatId, "Не удалось зарегистрироваться!");
+              return;
+            }
           });
-        return;
-      }
-      if (!isAuth) {
-        return;
-      }
-      bot.setMyCommands(authorizedMenu);
-      if (text.startsWith("/add store") && fromWho === 767355250) {
-        const words = text.split(" ");
-        await conn.query(`INSERT INTO stores SET ?`, {
-          store_name: words[2],
-          api_token: words[3],
-          manager: words[4],
-        });
-        await bot.sendMessage(
-          chatId,
-          "Store with name = `" +
-            words[2] +
-            "` successfully added to the database."
-        );
-        return;
-      }
-      if (text.startsWith("/delete store") && fromWho === adminId) {
-        const words = text.split(" ");
-        await conn.query(`DELETE FROM stores WHERE id = "${words[2]}"`);
-        await bot.sendMessage(
-          chatId,
-          "Store with ID = " + words[2] + " deleted."
-        );
-        return;
-      }
-      if (text === "/start" && !msg.reply_to_message) {
-        const stores = (await conn.query("SELECT * FROM stores"))[0];
-        const buttons = stores.map((store) => {
-          return [
+          return;
+        }
+        if (!isAuth) {
+          return;
+        }
+        if (
+          text === "Удалить регистрацию🚪" &&
+          !msg.reply_to_message &&
+          bother
+        ) {
+          const messageForDelete = await bot.sendMessage(
+            chatId,
+            "Вы уверены что хотите удалить регистрацию?"
+          );
+          await bot.editMessageReplyMarkup(
             {
-              text: `[${store.id}] ${store.store_name} - ${store.manager}`,
-              callback_data: `use ${store.id} ${store.api_token}`,
+              inline_keyboard: [
+                [
+                  {
+                    text: `Нет`,
+                    callback_data: `n ${messageForDelete.message_id}`,
+                  },
+                  {
+                    text: `Да`,
+                    callback_data: `d ${fromWho} ${messageForDelete.message_id}`,
+                  },
+                ],
+              ],
             },
-          ];
-        });
-        await bot.sendMessage(chatId, "Список всех магазинов:", {
-          reply_markup: JSON.stringify({
-            inline_keyboard: buttons,
-          }),
-        });
-        return;
+            {
+              chat_id: chatId,
+              message_id: messageForDelete.message_id,
+            }
+          );
+        }
+        if (text === "/start" && !msg.reply_to_message && bother) {
+          await bot.sendMessage(chatId, "Добро пожаловать в KaspiServiceBot!", {
+            reply_markup: JSON.stringify({
+              keyboard: [
+                [{ text: "Показать магазины📋" }],
+                [{ text: "Удалить регистрацию🚪" }],
+              ],
+              resizeKeyboard: true,
+            }),
+          });
+          return;
+        }
+        if (text === "Показать магазины📋" && !msg.reply_to_message && bother) {
+          const stores = await getStores(fromWho);
+          if (!stores) {
+            return bot.sendMessage(
+              chatId,
+              "Ошибка при получении списка магазинов!"
+            );
+          }
+          const messageForDelete = await bot.sendMessage(
+            chatId,
+            "Список всех магазинов:"
+          );
+          await bot.editMessageReplyMarkup(
+            {
+              inline_keyboard: stores.map((store) => {
+                return [
+                  {
+                    text: `${store.name}`,
+                    callback_data: `s ${store.id} ${fromWho} ${messageForDelete.message_id}`,
+                  },
+                ];
+              }),
+            },
+            {
+              chat_id: chatId,
+              message_id: messageForDelete.message_id,
+            }
+          );
+          return;
+        }
+      } catch (e) {
+        console.log(e.message);
+        await bot.sendMessage(chatId, "Ошибка! Пожалуйста попробуйте позднее.");
       }
     });
+
     bot.on("callback_query", async (query) => {
       const chatId = query.message.chat.id;
-      const fromWho = query.message.from.id;
       const queryId = query.id;
-      const text = query.message.text;
       const data = query.data;
-      if (data.startsWith("use")) {
+      if (data.startsWith("s ")) {
         try {
-          const [use, storeId, api_token] = data.split(" ");
+          const [_, storeId, fromWho, deleteMessageId] = data.split(" ");
+          const api_token = await getApiToken(parseInt(fromWho), storeId);
+          bot.deleteMessage(chatId, deleteMessageId);
           const orders = await getOrders(api_token);
-          const text = orders.map((order, index) => {
-            return `[${index}] 🔶 ${order.attributes.deliveryAddress.formattedAddress} 🔶 <a href="tel:+7768290879">${order.attributes.customer.cellPhone}</a>`;
-          });
-          const answer = text.join("\n\n");
           if (orders.length === 0) {
             await bot.answerCallbackQuery(queryId, {
               text: "Нет заказов.",
@@ -165,118 +296,126 @@ try {
             );
             return;
           }
-          await bot
-            .sendMessage(
-              chatId,
-              `Выбери заказ: Напиши номер заказа или номер заказа вместе с кодом через пробел. Сообщение принимает ответ в течение ${
-                parseInt(replyTimeout) / 60000
-              } минут.\n\n` + answer,
-              { ...forceReply, parse_mode: "HTML" }
-            )
-            .then(async (msg2) => {
-              await bot.answerCallbackQuery(queryId, {
-                text: "Магазин выбран. ID: " + storeId,
-              });
-              const replylistenerid = bot.onReplyToMessage(
-                msg2.chat.id,
-                msg2.message_id,
-                async (msg) => {
-                  try {
-                    bot.removeReplyListener(replylistenerid);
-                    const key = parseInt(msg.text.split(" ")[0]);
-                    const code = msg.text.split(" ")[1];
-                    if (code) {
-                      try {
-                        await sendCode(api_token, orders[key].id, true, code);
-			console.log(`${orders[key].attributes.deliveryAddress.formattedAddress} Заказ успешно выдан. ${(new Date()).toLocaleString()}`)
-                        await bot.sendMessage(
-                          chatId,
-                          "Код абсолютно верен! Заказ успешно выдан."
-                        );
-                        return;
-                      } catch (e) {
-                        await bot.sendMessage(
-                          chatId,
-                          "Ошибка! Кажется код не верен...\n" +
-                            (e.response?.data?.errorbs
-                              ? e.response?.data.errors[0].title
-                              : e.message)
-                        );
-                        return;
-                      }
-                    }
-                    await sendCode(api_token, orders[key].id);
-                    await bot
-                      .sendMessage(
-                        msg2.chat.id,
-                        `Код успешно отправлен и в скором времени дойдет до покупателя. Чтобы подтвердить код, просто ответьте на это сообщение. В течение ${
-                          parseInt(replyTimeout) / 60000
-                        } минут!`,
-                        forceReply
-                      )
-                      .then((msg3) => {
-                        const replylistenerid = bot.onReplyToMessage(
-                          msg3.chat.id,
-                          msg3.message_id,
-                          async (msg4) => {
-                            try {
-                              bot.removeReplyListener(replylistenerid);
-                              await sendCode(
-                                api_token,
-                                orders[key].id,
-                                true,
-                                msg4.text
-                              );
-			      console.log(`${orders[key].attributes.deliveryAddress.formattedAddress} Заказ успешно выдан. ${(new Date()).toLocaleString()}`)
-                              await bot.sendMessage(
-                                msg4.chat.id,
-                                "Код абсолютно верен! Заказ успешно выдан."
-                              );
-                            } catch (e) {
-                              await bot.sendMessage(
-                                msg4.chat.id,
-                                "Ошибка! Кажется код не верен...\n" +
-                                  (e.response?.data?.errors
-                                    ? e.response?.data.errors[0].title
-                                    : e.message)
-                              );
-                            }
-                          }
-                        );
-                        setTimeout(
-                          removeReplyListener,
-                          parseInt(replyTimeout),
-                          replylistenerid
-                        );
-                      });
-                  } catch (e) {
-                    await bot.sendMessage(
-                      msg2.chat.id,
-                      "Ошибка! Неправильный номер заказа или возможно вы уже недавно отправляли код. Попробуйте еще раз немного позднее.\n" +
-                        (e.response?.data?.errors
-                          ? e.response.data.errors[0].title
-                          : e.message)
-                    );
-                  }
-                }
-              );
-              setTimeout(
-                removeReplyListener,
-                parseInt(replyTimeout),
-                replylistenerid
-              );
-            });
+          await bot.answerCallbackQuery(queryId, {
+            text: "Магазин выбран.",
+          });
+          const messageForDelete = await bot.sendMessage(
+            chatId,
+            "Выберите заказ:"
+          );
+          await bot.editMessageReplyMarkup(
+            {
+              inline_keyboard: orders.map((order) => {
+                const callback_data = `o ${order.id} ${storeId} ${fromWho} ${messageForDelete.message_id}`;
+                return [
+                  {
+                    text: `${order.attributes.deliveryAddress.formattedAddress}`,
+                    callback_data,
+                  },
+                ];
+              }),
+            },
+            {
+              chat_id: chatId,
+              message_id: messageForDelete.message_id,
+            }
+          );
         } catch (e) {
           console.log(e);
           await bot.answerCallbackQuery(queryId, {
-            text: "Возникла ошибка!\n" + e,
+            text: "Ошибка при получении заказов магазина.",
+          });
+        }
+      }
+      if (data.startsWith("n ")) {
+        const [_, deleteMessageId] = data.split(" ");
+        bot.deleteMessage(chatId, deleteMessageId);
+        await bot.answerCallbackQuery(queryId, {
+          text: "Ну и правильно...",
+        });
+      }
+      if (data.startsWith("d ")) {
+        const [_, fromWho, deleteMessageId] = data.split(" ");
+        const result = await quitTheStore(parseInt(fromWho));
+        if (!result) {
+          await bot.answerCallbackQuery(queryId, {
+            text: "Не удалось удалить регистрацию!",
+          });
+          return bot.deleteMessage(chatId, deleteMessageId);
+        }
+        await bot.answerCallbackQuery(queryId, {
+          text: "Регистрация успешно удалена...",
+        });
+        bot.sendMessage(chatId, "Регистрация успешно удалена!");
+        bot.deleteMessage(chatId, deleteMessageId);
+      }
+      if (data.startsWith("o ")) {
+        try {
+          const [_, orderId, storeId, fromWho, deleteMessageId] =
+            data.split(" ");
+          const api_token = await getApiToken(parseInt(fromWho), storeId);
+          const response = await sendCode(api_token, orderId, false);
+          if (!response) {
+            return bot.answerCallbackQuery(queryId, {
+              text: `Ошибка! Не удалось отправить код.`,
+            });
+          }
+          await bot.answerCallbackQuery(queryId, {
+            text: `Код успешно отправлен.`,
+          });
+          bot.deleteMessage(chatId, deleteMessageId);
+          bot.sendMessage(chatId, "Введите код который пришел заказчику:");
+          addToNotBother(parseInt(fromWho));
+          bot.once("message", async (msg) => {
+            try {
+              const response = await sendCode(
+                api_token,
+                orderId,
+                true,
+                msg.text
+              );
+              removeFromDontBother(parseInt(fromWho));
+              if (!response) {
+                return bot.sendMessage(
+                  chatId,
+                  `Ошибка! Кажется неверный код...`
+                );
+              }
+              console.log(
+                `${orderId} Заказ успешно выдан. ${moment().format(
+                  "DD.MM HH:mm"
+                )}`
+              );
+              await bot.sendMessage(
+                chatId,
+                "Код абсолютно верен! Заказ успешно выдан."
+              );
+            } catch (e) {
+              console.log(e.message);
+              await bot.sendMessage(
+                chatId,
+                "Ошибка при отправке кода!\n" +
+                  (e.response?.data?.errors
+                    ? e.response?.data.errors[0].title
+                    : e.message)
+              );
+            }
+          });
+        } catch (e) {
+          console.log(e.message);
+          await bot.answerCallbackQuery(queryId, {
+            text: "Возникла ошибка!\n",
           });
         }
       }
     });
   })();
 } catch (e) {
-  console.log("\x1b[31m%s\x1b[0m",`Бот поломался... ${(new Date()).toLocaleString()}`);
+  console.log(e.message);
+  console.log(
+    "\x1b[31m%s\x1b[0m",
+    `Бот поломался... ${new Date().toLocaleString()}`
+  );
   console.log("Перезапускаем бота...");
   start();
 }
